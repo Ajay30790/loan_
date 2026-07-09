@@ -340,15 +340,15 @@ with st.sidebar:
     st.markdown("""
     <div style="font-size: 0.8rem; color: #666; text-align: center;">
         <p style="margin: 0;">🏛️ IIT Jammu</p>
-        <p style="margin: 0;">📧 internship@iitjammu.ac.in</p>
+        <p style="margin: 0;">📧 Asdharupur1@gmail.com</p>
         <p style="margin: 0;">📅 Week 5 | 2024</p>
         <hr style="margin: 10px 0;">
         <div class="social-icons">
-            <a href="https://github.com" target="_blank"><img src="https://img.icons8.com/ios-glyphs/25/000000/github.png" style="width: 22px;"></a>
-            <a href="https://linkedin.com" target="_blank"><img src="https://img.icons8.com/ios-glyphs/25/000000/linkedin.png" style="width: 22px;"></a>
+            <a href="https://github.com/asdharupur1-boop" target="_blank"><img src="https://img.icons8.com/ios-glyphs/25/000000/github.png" style="width: 22px;"></a>
+            <a href="https://www.linkedin.com/in/ayush-shukla-ds/" target="_blank"><img src="https://img.icons8.com/ios-glyphs/25/000000/linkedin.png" style="width: 22px;"></a>
             <a href="https://www.iitjammu.ac.in" target="_blank"><img src="https://img.icons8.com/color/25/000000/university.png" style="width: 22px;"></a>
         </div>
-        <p style="margin-top: 10px; font-size: 0.7rem; color: #999;">Made with ❤️ at IIT Jammu</p>
+        <p style="margin-top: 10px; font-size: 0.7rem; color: #999;">Built by Ayush Shukla | IIT Jammu</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -363,8 +363,8 @@ st.markdown("""
     <span class="separator">|</span>
     <span>🤖 Loan Rejection Prediction</span>
     <span class="separator">|</span>
-    <a href="https://github.com" target="_blank">🐙 GitHub</a>
-    <a href="https://linkedin.com" target="_blank">🔗 LinkedIn</a>
+    <a href="https://github.com/asdharupur1-boop" target="_blank">🐙 GitHub</a>
+    <a href="https://www.linkedin.com/in/ayush-shukla-ds/" target="_blank">🔗 LinkedIn</a>
     <a href="https://www.iitjammu.ac.in" target="_blank">🏛️ IIT Jammu</a>
 </div>
 """, unsafe_allow_html=True)
@@ -1133,7 +1133,10 @@ else:
     ---
 
     ### 📧 Contact
-    - **Email**: internship@iitjammu.ac.in
+    - **Developer**: Ayush Shukla
+    - **Email**: Asdharupur1@gmail.com
+    - **GitHub**: [github.com/asdharupur1-boop](https://github.com/asdharupur1-boop)
+    - **LinkedIn**: [linkedin.com/in/ayush-shukla-ds](https://www.linkedin.com/in/ayush-shukla-ds/)
     """)
 
 st.markdown("---")
@@ -1141,10 +1144,10 @@ col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     st.markdown("""
     <div style="display: flex; justify-content: center; gap: 20px; padding: 10px;">
-        <a href="https://github.com" target="_blank" style="text-decoration: none;">
+        <a href="https://github.com/asdharupur1-boop" target="_blank" style="text-decoration: none;">
             <button style="background: #24292e; color: white; border: none; padding: 10px 30px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1rem;">🐙 View on GitHub</button>
         </a>
-        <a href="https://linkedin.com" target="_blank" style="text-decoration: none;">
+        <a href="https://www.linkedin.com/in/ayush-shukla-ds/" target="_blank" style="text-decoration: none;">
             <button style="background: #0a66c2; color: white; border: none; padding: 10px 30px; border-radius: 5px; font-weight: bold; cursor: pointer; font-size: 1rem;">🔗 Connect on LinkedIn</button>
         </a>
     </div>
@@ -1158,11 +1161,11 @@ st.markdown("""
 <p>
     🏛️ <strong>IIT Jammu</strong> - Internship Program | Week 5 Assignment | Loan Rejection Prediction
     <br>
-    <a href="https://github.com" target="_blank">GitHub</a> •
-    <a href="https://linkedin.com" target="_blank">LinkedIn</a> •
+    <a href="https://github.com/asdharupur1-boop" target="_blank">GitHub</a> •
+    <a href="https://www.linkedin.com/in/ayush-shukla-ds/" target="_blank">LinkedIn</a> •
     <a href="https://www.iitjammu.ac.in" target="_blank">IIT Jammu</a>
     <br>
-    <span style="font-size: 0.8rem; color: #999;">Made with ❤️ at IIT Jammu | © 2024 | Enhanced Edition</span>
+    <span style="font-size: 0.8rem; color: #999;">Built by Ayush Shukla | Made with ❤️ at IIT Jammu | © 2024 | Enhanced Edition</span>
 </p>
 </div>
 """, unsafe_allow_html=True)
