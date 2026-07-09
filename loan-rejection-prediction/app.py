@@ -141,6 +141,42 @@ st.markdown("""
     .risk-bar-fill.low { background: #2ecc71; }
     .status-ok { color: #2ecc71; font-weight: bold; }
     .status-bad { color: #e74c3c; font-weight: bold; }
+
+    /* ---- Bigger, clearer sidebar navigation menu ---- */
+    div[data-testid="stSidebar"] div[role="radiogroup"] label {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.5rem;
+        border-radius: 10px;
+        background: #f0f2fa;
+        border: 1px solid #dfe3f5;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        width: 100%;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: #e0e4fa;
+        border-color: #1a237e;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
+        background: linear-gradient(135deg, #1a237e, #283593);
+        border-color: #1a237e;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
+        color: white !important;
+        font-weight: 700 !important;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label p {
+        font-size: 1.05rem !important;
+        color: #1a237e;
+        font-weight: 600;
+        margin: 0 !important;
+    }
+    div[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
+        transform: scale(1.2);
+        margin-right: 0.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -275,7 +311,8 @@ with st.sidebar:
         "🕑 Prediction History",
         "📚 Documentation"
     ]
-    page = st.radio("Navigate to", pages, index=0)
+    st.markdown("#### 🧭 Navigate to")
+    page = st.radio("Navigate to", pages, index=0, label_visibility="collapsed")
 
     st.markdown("---")
     st.markdown("#### 🔧 System Status")
@@ -344,10 +381,10 @@ if page == "🏠 Dashboard":
             st.markdown(f'<div class="metric-card"><div class="metric-value" style="color:#f39c12;">{rate:.1f}%</div><div class="metric-label">📊 Rejection Rate</div></div>', unsafe_allow_html=True)
         with col4:
             avg_income = safe_col(data, 'INCOME').mean()
-            st.markdown(f'<div class="metric-card"><div class="metric-value">${avg_income:,.0f}</div><div class="metric-label">💰 Average Income</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><div class="metric-value">₹{avg_income:,.0f}</div><div class="metric-label">💰 Average Income</div></div>', unsafe_allow_html=True)
         with col5:
             avg_debt = safe_col(data, 'DEBT').mean()
-            st.markdown(f'<div class="metric-card"><div class="metric-value">${avg_debt:,.0f}</div><div class="metric-label">💳 Average Debt</div></div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="metric-card"><div class="metric-value">₹{avg_debt:,.0f}</div><div class="metric-label">💳 Average Debt</div></div>', unsafe_allow_html=True)
 
         st.markdown("---")
         col1, col2 = st.columns(2)
@@ -377,7 +414,7 @@ if page == "🏠 Dashboard":
                 fig = px.scatter(
                     sample_df, x='INCOME', y='DEBT', color='LOAN_REJECTED',
                     title="Income vs Debt by Loan Status",
-                    labels={'INCOME': 'Income ($)', 'DEBT': 'Debt ($)'},
+                    labels={'INCOME': 'Income (₹)', 'DEBT': 'Debt (₹)'},
                     color_discrete_map={0: '#2ecc71', 1: '#e74c3c'}, opacity=0.6
                 )
                 fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(size=12), height=400)
@@ -549,13 +586,13 @@ elif page == "📈 Risk Analytics":
         with col1:
             if 'INCOME' in data.columns:
                 fig = px.box(data, x='LOAN_REJECTED', y='INCOME', title='Income Distribution by Loan Status',
-                             labels={'LOAN_REJECTED': 'Loan Rejected', 'INCOME': 'Income ($)'},
+                             labels={'LOAN_REJECTED': 'Loan Rejected', 'INCOME': 'Income (₹)'},
                              color='LOAN_REJECTED', color_discrete_map={0: '#2ecc71', 1: '#e74c3c'}, height=400)
                 st.plotly_chart(fig, use_container_width=True)
         with col2:
             if 'NETWORTH' in data.columns:
                 fig = px.box(data, x='LOAN_REJECTED', y='NETWORTH', title='Net Worth Distribution by Loan Status',
-                             labels={'LOAN_REJECTED': 'Loan Rejected', 'NETWORTH': 'Net Worth ($)'},
+                             labels={'LOAN_REJECTED': 'Loan Rejected', 'NETWORTH': 'Net Worth (₹)'},
                              color='LOAN_REJECTED', color_discrete_map={0: '#2ecc71', 1: '#e74c3c'}, height=400)
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -751,10 +788,10 @@ elif page == "🎯 Predict Loan Status":
 
         with col2:
             st.markdown("#### 💰 Financial Information")
-            income = st.number_input("Annual Income ($)", min_value=0, value=50000, step=1000, key="income")
-            debt = st.number_input("Total Debt ($)", min_value=0, value=25000, step=1000, key="debt")
-            assets = st.number_input("Total Assets ($)", min_value=0, value=100000, step=5000, key="assets")
-            networth = st.number_input("Net Worth ($)", min_value=0, value=50000, step=5000, key="networth")
+            income = st.number_input("Annual Income (₹)", min_value=0, value=500000, step=10000, key="income")
+            debt = st.number_input("Total Debt (₹)", min_value=0, value=250000, step=10000, key="debt")
+            assets = st.number_input("Total Assets (₹)", min_value=0, value=1000000, step=50000, key="assets")
+            networth = st.number_input("Net Worth (₹)", min_value=0, value=500000, step=50000, key="networth")
 
         with col3:
             st.markdown("#### 📊 Risk Indicators")
@@ -764,9 +801,9 @@ elif page == "🎯 Predict Loan Status":
             late_payment = st.selectbox("Late on Payments (60+ days)", options=[0, 1], format_func=lambda x: "Yes" if x == 1 else "No", key="late_payment")
 
         if income == 0:
-            st.warning("⚠️ Income is $0 — debt-to-income ratio will be undefined/treated as 0. Consider entering a realistic income.")
+            st.warning("⚠️ Income is ₹0 — debt-to-income ratio will be undefined/treated as 0. Consider entering a realistic income.")
         if assets == 0:
-            st.warning("⚠️ Assets are $0 — leverage ratio will be undefined/treated as 0.")
+            st.warning("⚠️ Assets are ₹0 — leverage ratio will be undefined/treated as 0.")
 
         debt_to_income = debt / income if income > 0 else 0
         leverage = debt / assets if assets > 0 else 0
