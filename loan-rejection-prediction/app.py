@@ -142,40 +142,36 @@ st.markdown("""
     .status-ok { color: #2ecc71; font-weight: bold; }
     .status-bad { color: #e74c3c; font-weight: bold; }
 
-    /* ---- Bigger, clearer sidebar navigation menu ---- */
-    div[data-testid="stSidebar"] div[role="radiogroup"] label {
-        display: flex;
-        align-items: center;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-        border-radius: 10px;
+    /* ---- Sidebar navigation buttons: big, obvious, one-click ---- */
+    div[data-testid="stSidebar"] div[data-testid="stButton"] button {
+        text-align: left;
+        justify-content: flex-start;
         background: #f0f2fa;
-        border: 1px solid #dfe3f5;
-        transition: all 0.2s ease;
-        cursor: pointer;
-        width: 100%;
-    }
-    div[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
-        background: #e0e4fa;
-        border-color: #1a237e;
-    }
-    div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) {
-        background: linear-gradient(135deg, #1a237e, #283593);
-        border-color: #1a237e;
-    }
-    div[data-testid="stSidebar"] div[role="radiogroup"] label:has(input:checked) p {
-        color: white !important;
-        font-weight: 700 !important;
-    }
-    div[data-testid="stSidebar"] div[role="radiogroup"] label p {
-        font-size: 1.05rem !important;
         color: #1a237e;
         font-weight: 600;
-        margin: 0 !important;
+        font-size: 1.02rem;
+        border: 1px solid #dfe3f5;
+        border-radius: 10px;
+        padding: 0.65rem 1rem;
+        margin-bottom: 0.4rem;
+        box-shadow: none;
+        transition: all 0.15s ease;
     }
-    div[data-testid="stSidebar"] div[role="radiogroup"] label > div:first-child {
-        transform: scale(1.2);
-        margin-right: 0.5rem;
+    div[data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+        background: #e0e4fa;
+        border-color: #1a237e;
+        transform: translateX(2px);
+    }
+    /* Active page = Streamlit "primary" button type */
+    div[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {
+        background: linear-gradient(135deg, #1a237e, #283593);
+        color: white;
+        border-color: #1a237e;
+        box-shadow: 0 2px 10px rgba(26, 35, 126, 0.35);
+    }
+    div[data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"]:hover {
+        transform: none;
+        background: linear-gradient(135deg, #1a237e, #283593);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -311,8 +307,23 @@ with st.sidebar:
         "🕑 Prediction History",
         "📚 Documentation"
     ]
+
+    if "nav_page" not in st.session_state:
+        st.session_state.nav_page = pages[0]
+
     st.markdown("#### 🧭 Navigate to")
-    page = st.radio("Navigate to", pages, index=0, label_visibility="collapsed")
+    for p in pages:
+        is_active = (st.session_state.nav_page == p)
+        if st.button(
+            p,
+            key=f"nav_btn_{p}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+        ):
+            st.session_state.nav_page = p
+            st.rerun()
+
+    page = st.session_state.nav_page
 
     st.markdown("---")
     st.markdown("#### 🔧 System Status")
