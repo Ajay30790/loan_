@@ -30,6 +30,7 @@ import plotly.graph_objects as go
 from sklearn.metrics import (
     confusion_matrix, classification_report, roc_curve, auc
 )
+from sklearn.inspection import permutation_importance
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -273,6 +274,118 @@ def safe_col(data, name, fallback=0.0):
     if name in data.columns:
         return data[name]
     return pd.Series([fallback] * len(data), index=data.index)
+
+# ============================================================================
+# EXPLAINABLE AI (XAI) HELPERS
+# ----------------------------------------------------------------------------
+# These are model-agnostic (work for logistic regression, random forest,
+# gradient boosting, or anything with predict_proba) so we don't need to add
+# a heavy dependency like the `shap` package, which can be slow/fragile to
+# install on Streamlit Community Cloud.
+#
+# Local explanation = "ablation"/occlusion method: for one applicant, swap
+# each feature one at a time for the population's typical (mean) value and
+# see how much the predicted rejection probability moves. A feature that
+# moves the probability a lot is an important driver for THIS applicant.
+#
+# Global explanation fallback = sklearn's permutation_importance, used only
+# when the model doesn't natively expose feature_importances_ / coef_.
+# ============================================================================
+
+def explain_single_prediction(model, scaler, feature_names, input_dict, background_df, top_n=10):
+    """
+    Returns (baseline_probability, DataFrame of feature contributions) for a
+    single applicant, using an ablation / occlusion approach.
+    Positive contribution = this feature's actual value PUSHES TOWARD rejection.
+    Negative contribution = this feature's actual value PUSHES TOWARD approval.
+    """
+    avail_feats = [f for f in feature_names if f in background_df.columns]
+    if not avail_feats:
+        avail_feats = feature_names
+
+    bg = background_df.reindex(columns=feature_names, fill_value=0).fillna(0)
+    if len(bg) > 300:
+        bg = bg.sample(300, random_state=42)
+    typical_values = bg.mean()
+
+    input_row = pd.DataFrame([input_dict]).reindex(columns=feature_names, fill_value=0).fillna(0)
+    baseline_scaled = scaler.transform(input_row)
+    baseline_proba = float(model.predict_proba(baseline_scaled)[0][1])
+
+    contributions = []
+    for feat in feature_names:
+        modified_row = input_row.copy()
+        modified_row[feat] = typical_values[feat]
+        modified_scaled = scaler.transform(modified_row)
+        modified_proba = float(model.predict_proba(modified_scaled)[0][1])
+        delta = baseline_proba - modified_proba
+        contributions.append({
+            "Feature": feat,
+            "Applicant_Value": input_dict.get(feat, 0),
+            "Typical_Value": round(float(typical_values[feat]), 3),
+            "Contribution": delta
+        })
+
+    contrib_df = pd.DataFrame(contributions)
+    contrib_df["Abs_Contribution"] = contrib_df["Contribution"].abs()
+    contrib_df = contrib_df.sort_values("Abs_Contribution", ascending=False).head(top_n)
+    return baseline_proba, contrib_df
+
+def plot_contribution_chart(contrib_df, title="Why this prediction?"):
+    """Horizontal bar chart: red = pushes toward rejection, green = pushes toward approval."""
+    plot_df = contrib_df.sort_values("Contribution")
+    colors = ["#e74c3c" if v > 0 else "#2ecc71" for v in plot_df["Contribution"]]
+    fig = go.Figure(go.Bar(
+        x=plot_df["Contribution"] * 100,
+        y=plot_df["Feature"],
+        orientation="h",
+        marker_color=colors,
+        text=[f"{v*100:+.1f} pp" for v in plot_df["Contribution"]],
+        textposition="outside"
+    ))
+    fig.update_layout(
+        title=title,
+        xaxis_title="Change in rejection probability (percentage points)",
+        yaxis_title="",
+        height=max(350, 35 * len(plot_df)),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=10, r=60, t=50, b=40)
+    )
+    return fig
+
+def get_global_feature_importance(model, scaler, feature_names, data, target_col='LOAN_REJECTED', sample_size=500):
+    """
+    Universal fallback for global feature importance:
+    1. Native feature_importances_ (tree models)
+    2. Native coef_ (linear models)
+    3. sklearn permutation_importance (anything else, e.g. SVM/KNN)
+    """
+    if hasattr(model, 'feature_importances_'):
+        return pd.DataFrame({
+            'Feature': feature_names, 'Importance': model.feature_importances_
+        }).sort_values('Importance', ascending=False), "native (feature_importances_)"
+
+    if hasattr(model, 'coef_'):
+        coefs = model.coef_[0] if np.ndim(model.coef_) > 1 else model.coef_
+        return pd.DataFrame({
+            'Feature': feature_names, 'Importance': np.abs(coefs)
+        }).sort_values('Importance', ascending=False), "native (coefficients, absolute value)"
+
+    if data is not None and target_col in data.columns:
+        avail = [f for f in feature_names if f in data.columns]
+        X = data[avail].fillna(0)
+        y = data[target_col]
+        if len(X) > sample_size:
+            idx = np.random.RandomState(42).choice(len(X), size=sample_size, replace=False)
+            X, y = X.iloc[idx], y.iloc[idx]
+        X_scaled = scaler.transform(X)
+        perm = permutation_importance(model, X_scaled, y, n_repeats=5, random_state=42, n_jobs=-1)
+        return pd.DataFrame({
+            'Feature': avail, 'Importance': perm.importances_mean
+        }).sort_values('Importance', ascending=False), "permutation importance (model-agnostic)"
+
+    return None, None
 
 # Load data and model
 data = load_data()
@@ -657,36 +770,40 @@ elif page == "🤖 Model Performance":
             st.metric("🎯 Accuracy", f"{performance.get('accuracy', 0):.4f}")
 
         st.markdown("---")
-        st.markdown("### 🔍 Feature Importance Analysis")
+        st.markdown("### 🔍 Feature Importance Analysis (Global XAI)")
         fi_path = find_first_existing(FEATURE_IMPORTANCE_CANDIDATES)
         feature_importance = None
+        importance_source = None
         if fi_path:
             try:
                 feature_importance = pd.read_csv(fi_path)
+                importance_source = "pre-computed file"
             except Exception as e:
                 st.warning(f"⚠️ Couldn't read feature importance file: {e}")
 
         if feature_importance is None and 'model' in model_data:
-            # Fall back to computing it directly from the model if it exposes it
             try:
                 model = model_data['model']
+                scaler = model_data['scaler']
                 feat_names = model_data.get('feature_names', [])
-                if hasattr(model, 'feature_importances_') and feat_names:
-                    feature_importance = pd.DataFrame({
-                        'Feature': feat_names,
-                        'Importance': model.feature_importances_
-                    }).sort_values('Importance', ascending=False)
-            except Exception:
-                pass
+                if feat_names:
+                    with st.spinner("Computing feature importance..."):
+                        feature_importance, importance_source = get_global_feature_importance(
+                            model, scaler, feat_names, data
+                        )
+            except Exception as e:
+                st.warning(f"⚠️ Couldn't compute feature importance: {e}")
 
         if feature_importance is not None:
+            st.caption(f"Source: {importance_source}")
             fig = px.bar(feature_importance.head(15), x='Importance', y='Feature',
                          title='Top 15 Most Important Features', orientation='h',
                          color='Importance', color_continuous_scale='Viridis', height=500)
             fig.update_layout(yaxis={'categoryorder': 'total ascending'})
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning("⚠️ Feature importance not available (no file found and model doesn't expose it).")
+            st.warning("⚠️ Feature importance not available (no file found, and the fallback methods failed).")
+
 
         st.markdown("### 📈 Model Performance Metrics")
         col1, col2 = st.columns(2)
@@ -911,6 +1028,39 @@ elif page == "🎯 Predict Loan Status":
                     <span>Low Risk</span><span>{risk_percentage:.0f}%</span><span>High Risk</span>
                 </div>""", unsafe_allow_html=True)
 
+                st.markdown("---")
+                st.markdown("## 🔍 Why This Prediction? (Explainable AI)")
+                if data is not None:
+                    try:
+                        with st.spinner("Computing explanation..."):
+                            _, contrib_df = explain_single_prediction(
+                                model, scaler, model_features, features, data, top_n=10
+                            )
+                        st.caption(
+                            "Each bar shows how much this applicant's actual value for that "
+                            "feature changed the rejection probability, compared to a typical "
+                            "applicant in the dataset. 🔴 Red = pushed toward rejection. "
+                            "🟢 Green = pushed toward approval."
+                        )
+                        fig_xai = plot_contribution_chart(contrib_df, title="Top factors driving this prediction")
+                        st.plotly_chart(fig_xai, use_container_width=True)
+
+                        with st.expander("📋 See exact values behind this explanation"):
+                            display_df = contrib_df[["Feature", "Applicant_Value", "Typical_Value", "Contribution"]].copy()
+                            display_df["Contribution (pp)"] = (display_df["Contribution"] * 100).round(2)
+                            display_df = display_df.drop(columns=["Contribution"])
+                            st.dataframe(display_df, use_container_width=True)
+
+                        st.download_button(
+                            "⬇️ Download Explanation (CSV)",
+                            contrib_df.to_csv(index=False).encode('utf-8'),
+                            file_name="prediction_explanation.csv"
+                        )
+                    except Exception as e:
+                        st.warning(f"⚠️ Couldn't generate an explanation: {e}")
+                else:
+                    st.info("ℹ️ Load a dataset (Dashboard or Dataset Overview) to enable explanations — they're computed by comparing this applicant against typical values in your data.")
+
                 # Save to session history
                 record = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -972,6 +1122,14 @@ elif page == "📥 Batch Prediction":
                     results['Predicted_Status'] = np.where(preds == 1, 'Rejected', 'Approved')
                     results['Rejection_Probability_%'] = (probs * 100).round(2)
 
+                    # Persist so the row-level explanation picker below survives reruns
+                    st.session_state.batch_results = results
+                    st.session_state.batch_X = X_batch
+
+                if "batch_results" in st.session_state:
+                    results = st.session_state.batch_results
+                    X_batch = st.session_state.batch_X
+
                     st.markdown("#### Results")
                     st.dataframe(results, use_container_width=True)
 
@@ -979,7 +1137,7 @@ elif page == "📥 Batch Prediction":
                     with col1:
                         st.metric("Total Applicants", f"{len(results):,}")
                     with col2:
-                        n_rejected = int((preds == 1).sum())
+                        n_rejected = int((results['Predicted_Status'] == 'Rejected').sum())
                         st.metric("Predicted Rejections", f"{n_rejected:,}")
                     with col3:
                         st.metric("Predicted Rejection Rate", f"{(n_rejected/len(results)*100):.1f}%")
@@ -993,8 +1151,38 @@ elif page == "📥 Batch Prediction":
                         results.to_csv(index=False).encode('utf-8'),
                         "batch_predictions.csv", "text/csv"
                     )
+
+                    st.markdown("---")
+                    st.markdown("### 🔍 Explain an Individual Applicant (XAI)")
+                    if data is not None:
+                        row_idx = st.selectbox(
+                            "Pick a row to explain",
+                            options=list(results.index),
+                            format_func=lambda i: f"Row {i} — {results.loc[i, 'Predicted_Status']} ({results.loc[i, 'Rejection_Probability_%']}%)",
+                            key="batch_explain_row"
+                        )
+                        if st.button("🔍 Explain This Applicant", key="explain_batch_row_btn"):
+                            try:
+                                scaler = model_data['scaler']
+                                model = model_data['model']
+                                input_dict = X_batch.loc[row_idx].to_dict()
+                                with st.spinner("Computing explanation..."):
+                                    _, contrib_df = explain_single_prediction(
+                                        model, scaler, model_features, input_dict, data, top_n=10
+                                    )
+                                st.caption(
+                                    "🔴 Red = pushed this applicant toward rejection. "
+                                    "🟢 Green = pushed toward approval, relative to a typical applicant."
+                                )
+                                fig_xai = plot_contribution_chart(contrib_df, title=f"Why row {row_idx} was predicted this way")
+                                st.plotly_chart(fig_xai, use_container_width=True)
+                            except Exception as e:
+                                st.warning(f"⚠️ Couldn't generate an explanation for this row: {e}")
+                    else:
+                        st.info("ℹ️ Load a dataset (Dashboard or Dataset Overview) to enable per-applicant explanations.")
             except Exception as e:
                 st.error(f"❌ Error processing batch file: {e}")
+
 
 # ============================================================================
 # PAGE 7: PREDICTION HISTORY (new)
